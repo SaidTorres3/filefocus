@@ -10,7 +10,7 @@ type ProjectConfig = {
 type ProjectGroup = {
   name: string;
   path: string[];
-  children?: ProjectGroup[]; // Nested child groups
+  groups?: ProjectGroup[]; // Nested child groups using "groups" property
 };
 
 /**
@@ -84,8 +84,8 @@ export class FileStorage implements FileFocusStorageProvider {
     }
     
     // Add child groups recursively
-    if (projectGroup.children) {
-      for (const childProjectGroup of projectGroup.children) {
+    if (projectGroup.groups) {
+      for (const childProjectGroup of projectGroup.groups) {
         this.createGroupFromProjectGroup(childProjectGroup, baseUri, group);
       }
     }
