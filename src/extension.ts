@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { GroupFacade } from "./GroupFacade";
 import { GroupManager } from "./GroupManager";
+import { Group } from "./Group";
 import { StorageService } from "./storage/StorageService";
 import { FileFocusTreeProvider } from "./tree/FileFocusTreeProvider";
 import { GroupItem } from "./tree/GroupItem";
@@ -267,29 +268,82 @@ function registerCommands(
   vscode.commands.registerCommand(
     "fileFocusExtension.moveGroupToParent",
     async (groupItem: GroupItem) => {
-      // Show quick pick to select parent group
-      const groupNames = groupManager.rootGroupNames.filter(name => {
-        const groupId = GroupManager.makeGroupId(name);
-        return groupId !== groupItem.groupId; // Don't allow moving to itself
-      });
+      const currentGroup = groupManager.root.get(groupItem.groupId);
+      if (!currentGroup) {
+        vscode.window.showErrorMessage("Group not found.");
+        return;
+      }
+
+      // Get all possible parent groups (excluding the current group and its descendants)
+      const allRootGroups = Array.from(groupManager.rootGroups.values());
+      const allGroups = Array.from(groupManager.root.values());
       
-      if (groupNames.length === 0) {
+      // Filter out the current group and its descendants to prevent circular references
+      const descendantIds = new Set([currentGroup.id, ...currentGroup.getAllChildGroups().map(g => g.id)]);
+      const availableGroups = allGroups.filter(group => !descendantIds.has(group.id));
+      
+      // Create options with clear hierarchy indication
+      const options: { label: string; groupId: string | null; description?: string }[] = [
+        { label: "Root Level", groupId: null, description: "Move to top level" }
+      ];
+      
+      // Add root groups
+      for (const group of availableGroups.filter(g => g.isRootGroup)) {
+        options.push({ 
+          label: group.name, 
+          groupId: group.id,
+          description: "Root group"
+        });
+      }
+      
+      // Add nested groups with indentation to show hierarchy
+      for (const group of availableGroups.filter(g => !g.isRootGroup)) {
+        const depth = getGroupDepth(group);
+        const indent = "  ".repeat(depth);
+        options.push({ 
+          label: `${indent}${group.name}`, 
+          groupId: group.id,
+          description: `Nested group (level ${depth + 1})`
+        });
+      }
+      
+      if (options.length === 1) {
         vscode.window.showInformationMessage("No available parent groups found.");
         return;
       }
 
-      const selectedName = await vscode.window.showQuickPick(
-        groupNames,
+      const selectedOption = await vscode.window.showQuickPick(
+        options.map(opt => ({
+          label: opt.label,
+          description: opt.description,
+          target: opt
+        })),
         {
           canPickMany: false,
-          placeHolder: "Select parent group"
+          placeHolder: "Select where to move this group"
         }
       );
 
-      if (selectedName) {
-        const parentId = GroupManager.makeGroupId(selectedName);
-        groupFacade.moveGroupToParent(groupItem.groupId, parentId);
+      if (selectedOption) {
+        if (selectedOption.target.groupId === null) {
+          // Move to root level
+          groupFacade.moveGroupToRoot(groupItem.groupId);
+        } else {
+          // Move to selected parent group
+          groupFacade.moveGroupToParent(groupItem.groupId, selectedOption.target.groupId);
+        }
       }
     }
   );
+
+  // Helper function to calculate group depth
+  function getGroupDepth(group: Group): number {
+    let depth = 0;
+    let current = group.parentGroup;
+    while (current) {
+      depth++;
+      current = current.parentGroup;
+    }
+    return depth;
+  }
 }

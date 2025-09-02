@@ -104,7 +104,19 @@ export class FileFocusTreeProvider
     sources: vscode.DataTransfer,
     token: vscode.CancellationToken
   ): Promise<void> {
+    const fileFocusDropType = this.fileFocusDropType(sources);
+    if (!fileFocusDropType) {
+      return;
+    }
+
+    // Handle dropping onto root level (when target is undefined)
     if (!target) {
+      if (fileFocusDropType === "application/vnd.code.tree.fileFocusTree") {
+        const transferItem = sources.get("application/vnd.code.tree.fileFocusTree");
+        if (transferItem) {
+          this.handleDropToRoot(transferItem.value as (FocusItem | GroupItem)[]);
+        }
+      }
       return;
     }
 
@@ -117,11 +129,6 @@ export class FileFocusTreeProvider
     }
 
     if (!targetGroup) {
-      return;
-    }
-
-    const fileFocusDropType = this.fileFocusDropType(sources);
-    if (!fileFocusDropType) {
       return;
     }
 
@@ -150,6 +157,49 @@ export class FileFocusTreeProvider
       default:
         return;
     }
+  }
+
+  /**
+   * Handle dropping items onto the root level of the tree (when target is undefined).
+   */
+  private handleDropToRoot(treeItems: (FocusItem | GroupItem)[]) {
+    const dirtyGroups = new Set<string>();
+    
+    for (const sourceItem of treeItems) {
+      if (sourceItem.objtype === "GroupItem") {
+        // Handle dropping groups to root level (move to root)
+        const groupItem = sourceItem as GroupItem;
+        const sourceGroup = this.groupManager.root.get(groupItem.groupId);
+        
+        if (!sourceGroup) {
+          continue;
+        }
+
+        // If the group is already at root level, skip it
+        if (sourceGroup.isRootGroup) {
+          continue;
+        }
+
+        // Move the group to root level
+        if (this.groupManager.moveGroup(sourceGroup.id, null)) {
+          if (sourceGroup.parentGroup) {
+            dirtyGroups.add(sourceGroup.parentGroup.id);
+          }
+          dirtyGroups.add(sourceGroup.id);
+        }
+      }
+      // Note: We don't handle FocusItems dropped to root because they need a group to belong to
+    }
+
+    // Save all affected groups
+    for (const groupId of dirtyGroups) {
+      const group = this.groupManager.root.get(groupId);
+      if (group) {
+        this.groupManager.saveGroup(group);
+      }
+    }
+
+    this.refresh();
   }
 
   private handleDropFileFocusItem(treeItems: (FocusItem | GroupItem)[], targetGroup: Group) {

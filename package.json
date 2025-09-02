@@ -100,12 +100,12 @@
       },
       {
         "command": "fileFocusExtension.moveGroupToRoot",
-        "title": "Move to Root",
+        "title": "Move to Root Level",
         "icon": "$(arrow-up)"
       },
       {
         "command": "fileFocusExtension.moveGroupToParent",
-        "title": "Move to Parent Group",
+        "title": "Move to Different Group",
         "icon": "$(arrow-right)"
       }
     ],
