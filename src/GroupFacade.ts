@@ -15,8 +15,9 @@ export class GroupFacade {
   /**
    * Adds a new Group to which resources can be added.
    * @param path Optional path that is immediatly added to the group on creation.
+   * @param parentGroupId Optional ID of parent group to create nested group.
    */
-  async addGroup(path?: string): Promise<void> {
+  async addGroup(path?: string, parentGroupId?: string): Promise<void> {
     const groupName = await vscode.window.showInputBox({
       placeHolder: vscode.l10n.t("Enter a name for the focus group"),
     });
@@ -35,7 +36,7 @@ export class GroupFacade {
 
     const group = new Group(groupId);
     group.name = groupName;
-    this.groupManager.addGroup(group, "statestorage");
+    this.groupManager.addGroup(group, "statestorage", parentGroupId);
     if (path) {
       await this.addGroupResource(path);
       return;
@@ -56,13 +57,17 @@ export class GroupFacade {
 
   /**
    * Opens all file resources in the vscode editor that are in the root of a group.
+   * Recursively opens files from all nested child groups as well.
    * @param groupId The ID of the group whos root resources are to be opened.
    */
   async openGroup(groupId: string): Promise<void> {
     const group = this.groupManager.root.get(groupId);
     if (group) {
+      // Get all resources recursively (includes files from nested groups)
+      const allResources = group.getAllResources();
+      
       let i = 1;
-      for (const resource of group.resources) {
+      for (const resource of allResources) {
         await vscode.commands.executeCommand(
           "vscode.open",
           resource,
@@ -201,6 +206,45 @@ export class GroupFacade {
       group.removeResource(uri);
       this.groupManager.saveGroup(group);
       vscode.commands.executeCommand("fileFocusTree.refreshEntry");
+    }
+  }
+
+  /**
+   * Adds a nested group to an existing group.
+   * @param parentGroupId The ID of the parent group.
+   */
+  async addNestedGroup(parentGroupId: string): Promise<void> {
+    await this.addGroup(undefined, parentGroupId);
+  }
+
+  /**
+   * Moves a group to be nested under another group.
+   * @param groupId The ID of the group to move.
+   * @param newParentId The ID of the new parent group.
+   */
+  async moveGroupToParent(groupId: string, newParentId: string): Promise<void> {
+    const success = this.groupManager.moveGroup(groupId, newParentId);
+    if (success) {
+      vscode.commands.executeCommand("fileFocusTree.refreshEntry");
+    } else {
+      await vscode.window.showErrorMessage(
+        vscode.l10n.t("Failed to move group. Group or parent not found.")
+      );
+    }
+  }
+
+  /**
+   * Moves a group to be a root-level group.
+   * @param groupId The ID of the group to move to root level.
+   */
+  async moveGroupToRoot(groupId: string): Promise<void> {
+    const success = this.groupManager.moveGroup(groupId, null);
+    if (success) {
+      vscode.commands.executeCommand("fileFocusTree.refreshEntry");
+    } else {
+      await vscode.window.showErrorMessage(
+        vscode.l10n.t("Failed to move group to root level.")
+      );
     }
   }
 }

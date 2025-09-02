@@ -202,6 +202,26 @@ export class TreeItemBuilder {
   }
 
   /**
+   * Create new TreeViewItem for representing a Group inside a vscode TreeView.
+   * This is the public version that can be used to create individual group items.
+   *
+   * @param group The group to create an item for.
+   * @param isPinned Whether this group is currently pinned.
+   * @returns A TreeViewItem that represents a group.
+   */
+  public createGroupItemPublic(group: Group, isPinned: boolean) {
+    const groupItem = new GroupItem(
+      group.name,
+      group.id,
+      vscode.TreeItemCollapsibleState.Collapsed,
+      isPinned,
+      group.readonly
+    );
+
+    return groupItem;
+  }
+
+  /**
    * Create new TreeViewItem for representing a file inside a vscode TreeView.
    *
    * @param label The label rendered for the Item in the tree view.

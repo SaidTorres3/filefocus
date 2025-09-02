@@ -68,11 +68,9 @@ export class FileFocusTreeProvider
     token: vscode.CancellationToken
   ): Promise<void> {
     const uriList: string[] = [];
-    /* Only allow dragging Root FocusItems for now.*/
+    
     for (const item of source) {
-      if (item.objtype !== "FocusItem") {
-        return;
-      } else {
+      if (item.objtype === "FocusItem") {
         const focusItem = item as FocusItem;
         /*
         When working with a wsl remote only file dragged to focus group from the
@@ -85,6 +83,7 @@ export class FileFocusTreeProvider
         const uri = vscode.Uri.parse(externalUri.query);
         uriList.push(uri.toString());
       }
+      // For GroupItems, we don't add to uriList since they're not file resources
     }
 
     treeDataTransfer.set(
@@ -92,7 +91,7 @@ export class FileFocusTreeProvider
       new vscode.DataTransferItem(source)
     );
 
-    if (uriList) {
+    if (uriList.length > 0) {
       treeDataTransfer.set(
         "text/uri-list",
         new vscode.DataTransferItem(FocusUtil.arrayToUriList(uriList))
@@ -101,7 +100,7 @@ export class FileFocusTreeProvider
   }
 
   public async handleDrop(
-    target: FocusItem | undefined,
+    target: FocusItem | GroupItem | undefined,
     sources: vscode.DataTransfer,
     token: vscode.CancellationToken
   ): Promise<void> {
@@ -109,7 +108,14 @@ export class FileFocusTreeProvider
       return;
     }
 
-    const targetGroup = this.groupManager.root.get(target.groupId);
+    // Determine the target group based on the target type
+    let targetGroup: Group | undefined;
+    if (target.objtype === "FocusItem") {
+      targetGroup = this.groupManager.root.get(target.groupId);
+    } else if (target.objtype === "GroupItem") {
+      targetGroup = this.groupManager.root.get(target.groupId);
+    }
+
     if (!targetGroup) {
       return;
     }
@@ -126,7 +132,7 @@ export class FileFocusTreeProvider
         );
         if (transferItem) {
           this.handleDropFileFocusItem(
-            transferItem.value as FocusItem[],
+            transferItem.value as (FocusItem | GroupItem)[],
             targetGroup
           );
         }
@@ -146,20 +152,50 @@ export class FileFocusTreeProvider
     }
   }
 
-  private handleDropFileFocusItem(treeItems: FocusItem[], targetGroup: Group) {
+  private handleDropFileFocusItem(treeItems: (FocusItem | GroupItem)[], targetGroup: Group) {
     const dirtyGroups = new Set<string>();
+    
     for (const sourceItem of treeItems) {
-      const sourceGroup = this.groupManager.root.get(sourceItem.groupId);
-      if (!sourceGroup || sourceGroup.id === targetGroup.id) {
-        continue;
+      if (sourceItem.objtype === "FocusItem") {
+        // Handle dropping file/folder resources
+        const focusItem = sourceItem as FocusItem;
+        const sourceGroup = this.groupManager.root.get(focusItem.groupId);
+        if (!sourceGroup || sourceGroup.id === targetGroup.id) {
+          continue;
+        }
+
+        dirtyGroups.add(sourceGroup.id);
+        sourceGroup.removeResource(focusItem.uri);
+        targetGroup.addResource(focusItem.uri);
+        
+      } else if (sourceItem.objtype === "GroupItem") {
+        // Handle dropping groups into other groups (nesting)
+        const groupItem = sourceItem as GroupItem;
+        const sourceGroup = this.groupManager.root.get(groupItem.groupId);
+        
+        if (!sourceGroup || sourceGroup.id === targetGroup.id) {
+          continue;
+        }
+
+        // Prevent circular nesting (group can't be moved into its own child)
+        if (this.wouldCreateCircularReference(sourceGroup, targetGroup)) {
+          vscode.window.showErrorMessage(
+            `Cannot move group "${sourceGroup.name}" into "${targetGroup.name}" - this would create a circular reference.`
+          );
+          continue;
+        }
+
+        // Move the group to be a child of the target group
+        if (this.groupManager.moveGroup(sourceGroup.id, targetGroup.id)) {
+          dirtyGroups.add(targetGroup.id);
+          if (sourceGroup.parentGroup) {
+            dirtyGroups.add(sourceGroup.parentGroup.id);
+          }
+        }
       }
-
-      dirtyGroups.add(sourceGroup.id);
-
-      sourceGroup.removeResource(sourceItem.uri);
-      targetGroup.addResource(sourceItem.uri);
     }
 
+    // Save all affected groups
     for (const groupId of dirtyGroups) {
       const group = this.groupManager.root.get(groupId);
       if (group) {
@@ -169,6 +205,20 @@ export class FileFocusTreeProvider
 
     this.groupManager.saveGroup(targetGroup);
     this.refresh();
+  }
+
+  /**
+   * Check if moving sourceGroup into targetGroup would create a circular reference.
+   */
+  private wouldCreateCircularReference(sourceGroup: Group, targetGroup: Group): boolean {
+    // A group cannot be moved into itself
+    if (sourceGroup.id === targetGroup.id) {
+      return true;
+    }
+
+    // A group cannot be moved into one of its own descendants
+    const allDescendants = sourceGroup.getAllChildGroups();
+    return allDescendants.some(descendant => descendant.id === targetGroup.id);
   }
 
   private handleDropUriList(uriList: string, targetGroup: Group) {
@@ -199,7 +249,7 @@ export class FileFocusTreeProvider
     return element;
   }
 
-  getChildren(element?: any): vscode.ProviderResult<FocusItem[] | GroupItem[]> {
+  getChildren(element?: any): vscode.ProviderResult<(FocusItem | GroupItem)[]> {
     /* When defined the user has picked an element. */
     if (element?.hasOwnProperty("objtype")) {
       if (element.objtype === "FocusItem") {
@@ -222,15 +272,35 @@ export class FileFocusTreeProvider
         const groupItem = element as GroupItem;
         const group = this.groupManager.root.get(groupItem.groupId);
         return group
-          ? this.itemBuilder.getResourceForGroup(group, this.sortkey)
+          ? this.getGroupContents(group, this.sortkey)
           : [];
       }
     } else {
+      // Return root level groups only
       return this.itemBuilder.getGroupItem(
-        this.groupManager.root,
+        this.groupManager.rootGroups,
         this.groupManager.pinnedGroupId
       );
     }
+  }
+
+  /**
+   * Get the contents of a group, including both resources and child groups.
+   */
+  private async getGroupContents(group: Group, sortKey: "path" | "basename"): Promise<(FocusItem | GroupItem)[]> {
+    const items: (FocusItem | GroupItem)[] = [];
+    
+    // Add child groups first
+    for (const childGroup of group.childGroups) {
+      const isPinned = childGroup.id === this.groupManager.pinnedGroupId;
+      items.push(this.itemBuilder.createGroupItemPublic(childGroup, isPinned));
+    }
+    
+    // Add file/folder resources
+    const resourceItems = await this.itemBuilder.getResourceForGroup(group, sortKey);
+    items.push(...resourceItems);
+    
+    return items;
   }
 
   private async getFolderContents(

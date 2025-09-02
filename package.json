@@ -92,6 +92,21 @@
         "command": "fileFocusExtension.createFile",
         "title": "%fileFocusExtension.createFile%",
         "icon": "$(new-file)"
+      },
+      {
+        "command": "fileFocusExtension.addNestedGroup",
+        "title": "Add Nested Group",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "fileFocusExtension.moveGroupToRoot",
+        "title": "Move to Root",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "fileFocusExtension.moveGroupToParent",
+        "title": "Move to Parent Group",
+        "icon": "$(arrow-right)"
       }
     ],
     "configuration": [
@@ -203,6 +218,21 @@
         {
           "command": "fileFocusExtension.createFile",
           "when": "view == fileFocusTree && viewItem =~ /FocusFolder/ && viewItem =~ /Write/"
+        },
+        {
+          "command": "fileFocusExtension.addNestedGroup",
+          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "group": "nested@1"
+        },
+        {
+          "command": "fileFocusExtension.moveGroupToParent",
+          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "group": "nested@2"
+        },
+        {
+          "command": "fileFocusExtension.moveGroupToRoot",
+          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "group": "nested@3"
         }
       ],
       "view/title": [

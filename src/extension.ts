@@ -248,4 +248,48 @@ function registerCommands(
       }
     }
   );
+
+  // New commands for nested groups
+  vscode.commands.registerCommand(
+    "fileFocusExtension.addNestedGroup",
+    (groupItem: GroupItem) => {
+      groupFacade.addNestedGroup(groupItem.groupId);
+    }
+  );
+
+  vscode.commands.registerCommand(
+    "fileFocusExtension.moveGroupToRoot",
+    (groupItem: GroupItem) => {
+      groupFacade.moveGroupToRoot(groupItem.groupId);
+    }
+  );
+
+  vscode.commands.registerCommand(
+    "fileFocusExtension.moveGroupToParent",
+    async (groupItem: GroupItem) => {
+      // Show quick pick to select parent group
+      const groupNames = groupManager.rootGroupNames.filter(name => {
+        const groupId = GroupManager.makeGroupId(name);
+        return groupId !== groupItem.groupId; // Don't allow moving to itself
+      });
+      
+      if (groupNames.length === 0) {
+        vscode.window.showInformationMessage("No available parent groups found.");
+        return;
+      }
+
+      const selectedName = await vscode.window.showQuickPick(
+        groupNames,
+        {
+          canPickMany: false,
+          placeHolder: "Select parent group"
+        }
+      );
+
+      if (selectedName) {
+        const parentId = GroupManager.makeGroupId(selectedName);
+        groupFacade.moveGroupToParent(groupItem.groupId, parentId);
+      }
+    }
+  );
 }
