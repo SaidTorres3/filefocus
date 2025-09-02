@@ -225,15 +225,53 @@ export class GroupManager {
     const provider = this._storageProvider.get(this.storageMap.get(id) ?? "");
     const src = this.root.get(id);
     if (provider && src) {
-      const dst = new Group(GroupManager.makeGroupId(name));
+      // Create new group with new ID based on new name
+      const newGroupId = GroupManager.makeGroupId(name);
+      const dst = new Group(newGroupId);
       dst.name = name;
+      dst.readonly = src.readonly;
+      
+      // Copy all direct resources
       for (const uri of src.resources) {
         if (uri) {
           dst.addResource(uri);
         }
       }
-      this.removeGroup(id);
-      this.addGroup(dst, provider.id);
+      
+      // Copy all child groups and maintain their hierarchy
+      // We need to copy the child groups array to avoid modification during iteration
+      const childGroups = [...src.childGroups];
+      for (const childGroup of childGroups) {
+        dst.addChildGroup(childGroup);
+      }
+      
+      // Preserve parent relationship
+      const parentGroup = src.parentGroup;
+      
+      // Remove the old group from maps and parent, but don't delete child groups
+      this.root.delete(id);
+      this.storageMap.delete(id);
+      if (src.isRootGroup) {
+        this.rootGroups.delete(id);
+      }
+      if (parentGroup) {
+        parentGroup.removeChildGroup(src);
+      }
+      
+      // Add the new group to maps
+      this.root.set(newGroupId, dst);
+      this.storageMap.set(newGroupId, provider.id);
+      
+      // Add to parent or root as appropriate
+      if (parentGroup) {
+        parentGroup.addChildGroup(dst);
+      } else {
+        this.rootGroups.set(newGroupId, dst);
+      }
+      
+      // Delete the old group from storage and save the new one
+      provider.deleteGroupId(id);
+      this.saveGroup(dst);
     }
   };
 
