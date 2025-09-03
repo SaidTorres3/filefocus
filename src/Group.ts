@@ -8,11 +8,19 @@ import { Uri } from "vscode";
 export class Group {
   private _resource: Uri[] = [];
   private _childGroups: Group[] = [];
+  private _name = "";
 
   /**
    * The name of the group that is shown in the UI.
    */
-  public name = "";
+  get name(): string {
+    return this._name;
+  }
+
+  set name(value: string | any) {
+    // Ensure the name is always a string to prevent [object Object] display issues
+    this._name = typeof value === 'string' ? value : String(value || '');
+  }
 
   /**
    * A read only group can not be altered or saved into storage.

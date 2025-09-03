@@ -203,13 +203,31 @@ function registerCommands(
 
   vscode.commands.registerCommand(
     "fileFocusExtension.addGroupResource",
-    (path: string | undefined) => {
-      if (path === undefined) {
+    (...args: any[]) => {
+      console.log('🔍 addGroupResource command called with args:', args);
+      
+      let path: string | undefined;
+      
+      // Check if first argument is a URI object
+      if (args[0] && typeof args[0] === 'object' && args[0].toString) {
+        path = args[0].toString();
+        console.log('🔍 extracted path from URI object:', path);
+      } else if (typeof args[0] === 'string') {
+        path = args[0];
+        console.log('🔍 using string path:', path);
+      } else {
         path = vscode.window.activeTextEditor?.document.uri.toString();
+        console.log('🔍 using active editor path:', path);
       }
 
+      vscode.window.showInformationMessage(`Final path: ${path}`);
+
       if (path) {
+        console.log('🔍 calling groupFacade.addGroupResource');
         groupFacade.addGroupResource(path);
+      } else {
+        console.log('❌ no path available');
+        vscode.window.showErrorMessage('No file path available to add to focus group');
       }
     }
   );

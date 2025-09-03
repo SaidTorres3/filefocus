@@ -80,7 +80,8 @@ export class StateStorage implements FileFocusStorageProvider {
    */
   private createGroupFromRecord(groupRecord: GroupRecord): Group {
     const group = new Group(groupRecord.id);
-    group.name = groupRecord.name;
+    // Ensure the name is always a string to prevent [object Object] issues
+    group.name = typeof groupRecord.name === 'string' ? groupRecord.name : String(groupRecord.name || '');
     
     // Add resources
     for (const resource of groupRecord.resources) {

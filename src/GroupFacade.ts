@@ -37,7 +37,7 @@ export class GroupFacade {
     const group = new Group(groupId);
     group.name = groupName;
     this.groupManager.addGroup(group, "statestorage", parentGroupId);
-    if (path) {
+    if (path && typeof path === 'string' && path.trim() !== '') {
       await this.addGroupResource(path);
       return;
     }
@@ -138,13 +138,77 @@ export class GroupFacade {
    * @returns
    */
   async addGroupResource(path: string): Promise<void> {
+    console.log('🔍 GroupFacade.addGroupResource called with:', path, 'type:', typeof path);
+    vscode.window.showInformationMessage(`GroupFacade received: ${path}`);
+    
+    // Validate that path is a non-empty string
+    console.log('🔍 Validating path:', {
+      path: path,
+      type: typeof path,
+      isString: typeof path === 'string',
+      length: path?.length,
+      trimmed: path?.trim(),
+      trimmedLength: path?.trim()?.length
+    });
+    
+    if (!path || typeof path !== 'string' || path.trim() === '') {
+      console.log('❌ invalid path, returning');
+      vscode.window.showErrorMessage('Invalid path provided');
+      return;
+    }
+
+    console.log('✅ path validation passed');
+    vscode.window.showInformationMessage('Path validation passed');
+
     /* If no writable focus group as been defined define a focus group. */
     if (this.groupManager.writableGroupNames.length === 0) {
-      vscode.commands.executeCommand("fileFocusExtension.addGroup", path);
+      console.log('🔍 No writable groups found, creating new group');
+      vscode.window.showInformationMessage('No groups exist, creating new one...');
+      
+      // Create a new group and add the resource to it
+      const groupName = await vscode.window.showInputBox({
+        placeHolder: vscode.l10n.t("Enter a name for the focus group"),
+      });
+
+      console.log('🔍 User entered group name:', groupName);
+
+      if (!groupName || groupName.trim() === "") {
+        console.log('❌ User cancelled group creation');
+        vscode.window.showInformationMessage('Group creation cancelled');
+        return;
+      }
+
+      const groupId = GroupManager.makeGroupId(groupName);
+      if (this.groupManager.root.has(groupId)) {
+        await vscode.window.showErrorMessage(
+          vscode.l10n.t("A focus group with this name already exists.")
+        );
+        return;
+      }
+
+      const group = new Group(groupId);
+      group.name = groupName;
+      this.groupManager.addGroup(group, "statestorage");
+      
+      // Now add the resource to the newly created group
+      const uri = vscode.Uri.parse(path);
+      try {
+        await vscode.workspace.fs.stat(uri);
+        group.addResource(uri);
+        this.groupManager.saveGroup(group);
+        vscode.commands.executeCommand("fileFocusTree.refreshEntry");
+      } catch (err) {
+        vscode.window.showErrorMessage(
+          vscode.l10n.t("Can't find resource in workspace.")
+        );
+      }
       return;
     }
 
     const groupName = await this.selectTargetGroup();
+    console.log('🔍 Selected target group:', groupName);
+    vscode.window.showInformationMessage(`Selected group: ${groupName || 'none'}`);
+    
     if (groupName) {
       const groupId = GroupManager.makeGroupId(groupName);
       if (this.groupManager.root.has(groupId)) {
@@ -153,15 +217,14 @@ export class GroupFacade {
           const uri = vscode.Uri.parse(path);
           try {
             await vscode.workspace.fs.stat(uri);
+            group.addResource(uri);
+            this.groupManager.saveGroup(group);
+            vscode.commands.executeCommand("fileFocusTree.refreshEntry");
           } catch (err) {
             vscode.window.showErrorMessage(
               vscode.l10n.t("Can't find resource in workspace.")
             );
           }
-
-          group.addResource(uri);
-          this.groupManager.saveGroup(group);
-          vscode.commands.executeCommand("fileFocusTree.refreshEntry");
         }
       }
     }
