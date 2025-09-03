@@ -189,17 +189,17 @@
         },
         {
           "command": "fileFocusExtension.pinGroup",
-          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "when": "view == fileFocusTree && viewItem == GroupItem && viewItem != GroupItemReadOnly",
           "group": "inline@4"
         },
         {
           "command": "fileFocusExtension.renameGroup",
-          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "when": "view == fileFocusTree && viewItem == GroupItem && viewItem != GroupItemReadOnly",
           "group": "inline@2"
         },
         {
           "command": "fileFocusExtension.removeGroup",
-          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "when": "view == fileFocusTree && viewItem == GroupItem && viewItem != GroupItemReadOnly",
           "group": "inline@1"
         },
         {
@@ -221,17 +221,17 @@
         },
         {
           "command": "fileFocusExtension.addNestedGroup",
-          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "when": "view == fileFocusTree && viewItem == GroupItem && viewItem != GroupItemReadOnly",
           "group": "nested@1"
         },
         {
           "command": "fileFocusExtension.moveGroupToParent",
-          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "when": "view == fileFocusTree && viewItem == GroupItem && viewItem != GroupItemReadOnly",
           "group": "nested@2"
         },
         {
           "command": "fileFocusExtension.moveGroupToRoot",
-          "when": "view == fileFocusTree && viewItem == GroupItem",
+          "when": "view == fileFocusTree && viewItem == GroupItem && viewItem != GroupItemReadOnly",
           "group": "nested@3"
         }
       ],

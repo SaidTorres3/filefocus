@@ -69,6 +69,31 @@ export class FileFocusTreeProvider
   ): Promise<void> {
     const uriList: string[] = [];
     
+    // Check if any source items are from readonly groups (can't be dragged)
+    for (const item of source) {
+      if (item.objtype === "GroupItem") {
+        const groupItem = item as GroupItem;
+        const group = this.groupManager.root.get(groupItem.groupId);
+        if (group && group.readonly) {
+          // Prevent dragging readonly groups (from .filefocus.json)
+          vscode.window.showInformationMessage(
+            `Cannot move "${group.name}" - groups from .filefocus.json are read-only and cannot be moved.`
+          );
+          return;
+        }
+      } else if (item.objtype === "FocusItem") {
+        const focusItem = item as FocusItem;
+        const group = this.groupManager.root.get(focusItem.groupId);
+        if (group && group.readonly) {
+          // Prevent dragging files/folders from readonly groups
+          vscode.window.showInformationMessage(
+            `Cannot move files from "${group.name}" - groups from .filefocus.json are read-only.`
+          );
+          return;
+        }
+      }
+    }
+    
     for (const item of source) {
       if (item.objtype === "FocusItem") {
         const focusItem = item as FocusItem;
@@ -129,6 +154,14 @@ export class FileFocusTreeProvider
     }
 
     if (!targetGroup) {
+      return;
+    }
+
+    // Prevent dropping into readonly groups (from .filefocus.json)
+    if (targetGroup.readonly) {
+      vscode.window.showInformationMessage(
+        `Cannot drop items into "${targetGroup.name}" - groups from .filefocus.json are read-only.`
+      );
       return;
     }
 

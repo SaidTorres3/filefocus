@@ -155,6 +155,13 @@ function registerCommands(
   vscode.commands.registerCommand(
     "fileFocusExtension.pinGroup",
     (groupItem: GroupItem) => {
+      const group = groupManager.root.get(groupItem.groupId);
+      if (group && group.readonly) {
+        vscode.window.showInformationMessage(
+          `Cannot pin "${group.name}" - groups from .filefocus.json cannot be pinned. Only user-created groups can be pinned.`
+        );
+        return;
+      }
       groupFacade.pinGroup(groupItem.groupId);
     }
   );
@@ -169,6 +176,13 @@ function registerCommands(
   vscode.commands.registerCommand(
     "fileFocusExtension.renameGroup",
     (groupItem: GroupItem) => {
+      const group = groupManager.root.get(groupItem.groupId);
+      if (group && group.readonly) {
+        vscode.window.showInformationMessage(
+          `Cannot rename "${group.name}" - groups from .filefocus.json are read-only. Edit the .filefocus.json file instead.`
+        );
+        return;
+      }
       groupFacade.renameGroup(groupItem.groupId);
     }
   );
@@ -176,6 +190,13 @@ function registerCommands(
   vscode.commands.registerCommand(
     "fileFocusExtension.removeGroup",
     (groupItem: GroupItem) => {
+      const group = groupManager.root.get(groupItem.groupId);
+      if (group && group.readonly) {
+        vscode.window.showInformationMessage(
+          `Cannot remove "${group.name}" - groups from .filefocus.json are read-only. Edit the .filefocus.json file instead.`
+        );
+        return;
+      }
       groupFacade.removeGroup(groupItem.groupId);
     }
   );
@@ -254,6 +275,13 @@ function registerCommands(
   vscode.commands.registerCommand(
     "fileFocusExtension.addNestedGroup",
     (groupItem: GroupItem) => {
+      const group = groupManager.root.get(groupItem.groupId);
+      if (group && group.readonly) {
+        vscode.window.showInformationMessage(
+          `Cannot add nested groups to "${group.name}" - groups from .filefocus.json are read-only. Edit the .filefocus.json file instead.`
+        );
+        return;
+      }
       groupFacade.addNestedGroup(groupItem.groupId);
     }
   );
@@ -261,6 +289,13 @@ function registerCommands(
   vscode.commands.registerCommand(
     "fileFocusExtension.moveGroupToRoot",
     (groupItem: GroupItem) => {
+      const group = groupManager.root.get(groupItem.groupId);
+      if (group && group.readonly) {
+        vscode.window.showInformationMessage(
+          `Cannot move "${group.name}" - groups from .filefocus.json are read-only. Edit the .filefocus.json file instead.`
+        );
+        return;
+      }
       groupFacade.moveGroupToRoot(groupItem.groupId);
     }
   );
@@ -268,6 +303,14 @@ function registerCommands(
   vscode.commands.registerCommand(
     "fileFocusExtension.moveGroupToParent",
     async (groupItem: GroupItem) => {
+      const group = groupManager.root.get(groupItem.groupId);
+      if (group && group.readonly) {
+        vscode.window.showInformationMessage(
+          `Cannot move "${group.name}" - groups from .filefocus.json are read-only. Edit the .filefocus.json file instead.`
+        );
+        return;
+      }
+
       const currentGroup = groupManager.root.get(groupItem.groupId);
       if (!currentGroup) {
         vscode.window.showErrorMessage("Group not found.");
